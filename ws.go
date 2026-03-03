@@ -21,13 +21,13 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	// step 1. check name (for esp32 is mac address)
 	msgType, p, err := conn.ReadMessage()
 	if err != nil {
-		log.Println(err)
+		log.Printf("[%d] conn read error: %v\n", connId, err)
 		close(doneCh)
 		return
 	}
 	if msgType != websocket.BinaryMessage {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
-			log.Println(err)
+			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid message type.", connId)
 		close(doneCh)
@@ -37,7 +37,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	*c, ok = appClients[string(p)]
 	if !ok {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
-			log.Println(err)
+			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid client.", connId)
 		close(doneCh)
@@ -52,9 +52,8 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 		byte(r2 >> 56 & 0xFF), byte(r2 >> 48 & 0xFF), byte(r2 >> 40 & 0xFF), byte(r2 >> 32 & 0xFF),
 		byte(r2 >> 24 & 0xFF), byte(r2 >> 16 & 0xFF), byte(r2 >> 8 & 0xFF), byte(r2 & 0xFF),
 	}
-	if err := conn.WriteMessage(websocket.BinaryMessage, verifyBytes); err != nil { // refuse connection
-		log.Println(err)
-		log.Printf("[%d] verifying error: failed to send verifying codes.", connId)
+	if err := conn.WriteMessage(websocket.BinaryMessage, verifyBytes); err != nil { // verify request
+		log.Printf("[%d] verifying error: failed to send verifying codes, error: %v", connId, err)
 		close(doneCh)
 		return
 	}
@@ -67,13 +66,13 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	afterMd5 := md5.Sum(beforeMd5)
 	msgType, p, err = conn.ReadMessage()
 	if err != nil {
-		log.Println(err)
+		log.Printf("[%d] conn read error: %v\n", connId, err)
 		close(doneCh)
 		return
 	}
 	if msgType != websocket.BinaryMessage || len(p) != 16 {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
-			log.Println(err)
+			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid verifying response.", connId)
 		close(doneCh)
@@ -81,7 +80,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	}
 	if !bytes.Equal(afterMd5[:], p) {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
-			log.Println(err)
+			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: unequal verifying response.", connId)
 		close(doneCh)
@@ -117,9 +116,10 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 	select {
 	case <-time.After(20 * time.Second):
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
-			log.Println(err)
+			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] connection closed: client verifying timeout\n", connId)
+		close(doneCh)
 		return
 	case <-doneCh: // main loop
 		if !rst {
@@ -145,7 +145,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 			select {
 			case b := <-c.chanToWs:
 				if err := conn.WriteMessage(websocket.BinaryMessage, b); err != nil {
-					log.Println(err)
+					log.Printf("[%d] conn write error: %v\n", connId, err)
 					continue
 				}
 			case err := <-errChan:
