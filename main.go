@@ -5,14 +5,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
-
-	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  8192,
-	WriteBufferSize: 8192,
-}
 
 func main() {
 	certPath := flag.String("cert", "cert.pem", "cert.pem path")

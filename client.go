@@ -13,18 +13,19 @@ const (
 )
 
 type Client struct {
-	ClientId        string // id
-	ClientType      int    // type
-	ClientName      string // name
-	ClientMac       string // MAC address (only ESP32)
-	OutClientsNames []string
-	Passkey         string // client key
-	activated       bool   // is client activated
-	chanFromWs      chan []byte
-	chanToWs        chan []byte
-	chanIn          chan dataPack
-	outClientsPtrs  []*Client
-	nowReceiving    string
+	ClientId          string // id
+	ClientType        int    // type
+	ClientName        string // name
+	ClientMac         string // MAC address (only ESP32)
+	OutClientsNames   []string
+	Passkey           string // client key
+	IgnoreFromChannel []int
+	IgnoreFromWs      []int
+	chanFromWs        chan []byte
+	chanToWs          chan []byte
+	chanIn            chan dataPack
+	outClientsPtrs    []*Client
+	nowReceiving      string
 }
 
 var appClients map[string]*Client
@@ -56,9 +57,8 @@ func loadClients() {
 func setFrom(c *Client, p *dataPack) {
 	if c.ClientType == ClientTypeUser {
 		fb := []byte{FROM}
-		select {
-		case c.chanToWs <- append(fb, p.from...):
-		default:
+		if len(c.chanToWs) < cap(c.chanToWs) {
+			c.chanToWs <- append(fb, p.from...)
 		}
 	}
 	c.nowReceiving = p.from
@@ -76,6 +76,18 @@ func (c *Client) initAndServe() {
 	for {
 		select {
 		case p := <-c.chanIn:
+			skip := false
+			for _, v := range c.IgnoreFromChannel {
+				if int(p.data[0]) == v {
+					log.Printf("%s ignored data from channel %d\n", c.ClientId, v)
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			log.Printf("%s received data from channel %d\n", c.ClientId, p.data[0])
 			switch p.data[0] {
 			case RX:
 				setFrom(c, &p)
@@ -103,18 +115,28 @@ func (c *Client) initAndServe() {
 				p.data[0] = IMG_UPLOAD_STOP
 			}
 			if c.nowReceiving == "" || c.nowReceiving == p.from {
-				select {
-				case c.chanToWs <- p.data:
-				default:
+				if len(c.chanToWs) < cap(c.chanToWs) {
+					c.chanToWs <- p.data
 				}
 			}
 		case b := <-c.chanFromWs:
+			skip := false
+			for _, v := range c.IgnoreFromWs {
+				if int(b[0]) == v {
+					log.Printf("%s ignored data from ws %d\n", c.ClientId, v)
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+			log.Printf("%s received data from ws %d\n", c.ClientId, b[0])
 			for _, oc := range c.outClientsPtrs {
-				if oc.activated {
-					select {
-					case oc.chanIn <- dataPack{from: c.ClientId, data: b}:
-					default:
-					}
+				if len(oc.chanIn) < cap(oc.chanIn) {
+					bCopy := make([]byte, len(b))
+					copy(bCopy, b)
+					oc.chanIn <- dataPack{from: c.ClientName, data: bCopy}
 				}
 			}
 		}

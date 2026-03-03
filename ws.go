@@ -11,12 +11,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- bool) {
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  8192,
+	WriteBufferSize: 8192,
+	CheckOrigin:     func(_ *http.Request) bool { return true },
+}
+
+func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan struct{}, rst *bool) {
 	// step 1. check name (for esp32 is mac address)
 	msgType, p, err := conn.ReadMessage()
 	if err != nil {
 		log.Println(err)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	if msgType != websocket.BinaryMessage {
@@ -24,7 +30,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 			log.Println(err)
 		}
 		log.Printf("[%d] verifying error: invalid message type.", connId)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	var ok bool
@@ -34,7 +40,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 			log.Println(err)
 		}
 		log.Printf("[%d] verifying error: invalid client.", connId)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	// step 2. ask for verify
@@ -49,7 +55,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 	if err := conn.WriteMessage(websocket.BinaryMessage, verifyBytes); err != nil { // refuse connection
 		log.Println(err)
 		log.Printf("[%d] verifying error: failed to send verifying codes.", connId)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	var beforeMd5 []byte
@@ -62,7 +68,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 	msgType, p, err = conn.ReadMessage()
 	if err != nil {
 		log.Println(err)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	if msgType != websocket.BinaryMessage || len(p) != 16 {
@@ -70,7 +76,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 			log.Println(err)
 		}
 		log.Printf("[%d] verifying error: invalid verifying response.", connId)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
 	if !bytes.Equal(afterMd5[:], p) {
@@ -78,12 +84,15 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan<- 
 			log.Println(err)
 		}
 		log.Printf("[%d] verifying error: unequal verifying response.", connId)
-		doneCh <- false
+		close(doneCh)
 		return
 	}
+	for len((*c).chanToWs) != 0 {
+		<-(*c).chanToWs // clear the channel
+	}
+	close(doneCh)
+	*rst = true
 	log.Printf("[%d] device verified: %s\n", connId, (*c).ClientName)
-	(*c).activated = true
-	doneCh <- true
 }
 
 func wsCallback(w http.ResponseWriter, r *http.Request) {
@@ -95,17 +104,15 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() {
-		if c != nil {
-			c.activated = false
-		}
 		log.Printf("[%d] connection closed.\n", connId)
 		conn.Close()
 	}()
 	log.Printf("[%d] client connected.\n", connId)
 
 	// verify connection
-	doneCh := make(chan bool)
-	go verifyClient(connId, conn, &c, doneCh)
+	doneCh := make(chan struct{})
+	rst := false
+	go verifyClient(connId, conn, &c, doneCh, &rst)
 
 	select {
 	case <-time.After(20 * time.Second):
@@ -113,14 +120,12 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 		log.Printf("[%d] connection closed: client verifying timeout\n", connId)
-		close(doneCh)
 		return
-	case ok := <-doneCh: // main loop
-		if !ok {
+	case <-doneCh: // main loop
+		if !rst {
 			log.Printf("[%d] connection closed: verifying failed.\n", connId)
 			return
 		}
-		close(doneCh)
 		errChan := make(chan error)
 		// read from conn
 		go func() {

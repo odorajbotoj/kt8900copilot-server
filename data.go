@@ -1,26 +1,26 @@
 package main
 
 const (
-	SKIP = iota
-	VERIFY
-	REFUSE
-	RX = iota - 3 + 0x11
-	RX_STOP
-	TX
-	TX_STOP
-	IMG_UPLOAD
-	IMG_UPLOAD_STOP
-	IMG_DOWNLOAD
-	IMG_DOWNLOAD_STOP
-	IMG_GET
-	SET_CONF
-	RESET
-	FROM
-	S_E_IMG_NIL = iota - 12 + 0x31
-	S_S_SET_CONF
-	S_E_SET_CONF
-	PCM = 0x51
-	IMG = 0x61
+	SKIP              = iota
+	VERIFY                               // s -> c
+	REFUSE                               // s -> c
+	RX                = iota - 3 + 0x11  // c -> s
+	RX_STOP                              // c -> s
+	TX                                   // s -> c
+	TX_STOP                              // s -> c
+	IMG_UPLOAD                           // c -> s
+	IMG_UPLOAD_STOP                      // c -> s
+	IMG_DOWNLOAD                         // s -> c
+	IMG_DOWNLOAD_STOP                    // s -> c
+	IMG_GET                              // c -> s -> c
+	SET_CONF                             // c -> s -> c
+	RESET                                // c -> s -> c
+	FROM                                 // s -> c
+	S_E_IMG_NIL       = iota - 12 + 0x31 // c -> s -> c
+	S_S_SET_CONF                         // c -> s -> c
+	S_E_SET_CONF                         // c -> s -> c
+	PCM               = 0x51             // c -> s -> c
+	IMG               = 0x61             // c -> s -> c
 )
 
 type dataPack struct {
