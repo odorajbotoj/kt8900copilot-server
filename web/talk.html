@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>kt8900copilot client by BG4QBF</title>
+    <script src="https://cdn.jsdelivr.net/npm/js-md5@0.8.3/build/md5.min.js"></script>
+</head>
+
+<body>
+    <h1>kt8900copilot simple client by BG4QBF</h1>
+    <div>
+        <div>
+            <label for="address">服务器: </label>
+            <input id="address" type="text">
+        </div>
+        <div>
+            <label for="username">用户名: </label>
+            <input id="username" type="text">
+        </div>
+        <div>
+            <label for="passkey">验证密钥: </label>
+            <input id="passkey" type="password">
+        </div>
+        <div>
+            <button id="start" onclick="startWs();">连接服务器</button>
+            <button id="stop"
+                onclick="if (ws && ws.readyState == WebSocket.OPEN) { ws.close(); ws = null; }">断开服务器</button>
+        </div>
+    </div>
+    <div>
+        <p><span>连接状态: </span><span id="wsstat">连接断开</span></p>
+    </div>
+    <div id="onconn" hidden>
+        <div>
+            <p><span>数据来源: </span><span id="datafrom"></span></p>
+            <p><span>数据状态: </span><span id="datastat"></span></p>
+        </div>
+        <div>
+            <div>
+                <button
+                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x19]));">拍照</button>
+            </div>
+            <div>
+                <label for="setconf">配置项: </label>
+                <input id="setconf" type="text">
+                <button onclick="setconf();">更新配置</button>
+            </div>
+            <div>
+                <button
+                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B]));">重启ESP32</button>
+            </div>
+            <button id="ptt" onclick="ptt(!pttStat);">单击发射</button>
+        </div>
+    </div>
+    <div id="outputs"></div>
+    <script id="pcm-player-js" type="text">
+        class PCMPlayer extends AudioWorkletProcessor { // g by chatgpt
+            constructor() {
+                super();
+                this.queue = [];
+                this.offset = 0;
+                this.buffered = 0;
+                this.started = false;
+                this.startThreshold = 16000 * 0.18; // 180ms 启动缓冲
+                this.port.onmessage = e => {
+                    this.queue.push(e.data);
+                    this.buffered += e.data.length;
+                };
+            }
+            process(inputs, outputs) {
+                const output = outputs[0][0];
+                // 启动阶段
+                if (!this.started) {
+                    if (this.buffered < this.startThreshold) {
+                        output.fill(0);
+                        return true;
+                    }
+                    this.started = true;
+                }
+                for (let i = 0; i < output.length; i++) {
+                    if (!this.queue.length) {
+                        // 真正耗尽才重置
+                        this.started = false;
+                        output.fill(0);
+                        return true;
+                    }
+                    const current = this.queue[0];
+                    output[i] = current[this.offset++];
+                    this.buffered--;
+                    if (this.offset >= current.length) {
+                        this.queue.shift();
+                        this.offset = 0;
+                    }
+                }
+                return true;
+            }
+        }
+        registerProcessor("pcm-player", PCMPlayer);
+    </script>
+    <script id="pcm-capture-js" type="text">
+        class PCMCapture extends AudioWorkletProcessor {
+            constructor() {
+                super();
+                this.ptt = false;
+                this.samplerate = 0;
+                this.buffersize = 512;
+                this.ringbuffer = new Int16Array(this.buffersize * 2);
+                this.writeindex = 0;
+                this.startindex = 0;
+                this.written = 0;
+                this.port.onmessage = ev => {
+                    if (ev.data.type === "ptt") {
+                        this.ptt = ev.data.value;
+                    }
+                    if (ev.data.type === "samplerate") {
+                        this.samplerate = ev.data.value + 0.0;
+                    }
+                };
+            }
+            process(inputs) {
+                const inp = inputs[0];
+                if (!inp.length) return true;
+                if (!this.ptt) return true;
+                const channel = inp[0];
+
+                let nowIndex = 0;
+                let step = this.samplerate / 16000.0;
+                let outSize = Math.ceil(channel.length * 16000.0 / this.samplerate);
+                for (let i = 0; i < outSize; i++) {
+                    this.ringbuffer[this.writeindex] = Math.max(-1, Math.min(1, channel[Math.floor(nowIndex)])) * 32767;
+                    this.writeindex = (this.writeindex + 1) % (this.buffersize * 2);
+                    this.written++;
+                    nowIndex += step;
+                }
+
+                if (this.written >= this.buffersize) {
+                    const buffer = new ArrayBuffer(this.written * 2 + 1);
+                    const view = new DataView(buffer);
+                    view.setUint8(0, 0x51);
+                    let nw = 0;
+                    for (let i = this.startindex; i != this.writeindex; i = (i + 1) % (this.buffersize * 2)) {
+                        view.setInt16(nw * 2 + 1, this.ringbuffer[i], true);
+                        nw++
+                    }
+                    this.port.postMessage({ "type": "buffer", "value": buffer });
+                    this.startindex = this.writeindex;
+                    this.written = 0;
+                }
+
+                return true;
+            }
+        }
+        registerProcessor("pcm-capture", PCMCapture);
+    </script>
+    <script>
+        var pttStat = false;
+        var ws = null;
+        const textEncoder = new TextEncoder();
+        const textDecoder = new TextDecoder();
+        var imgDataArr = [];
+
+        const audioCtx = new AudioContext();
+        var txNode = null;
+        var rxNode = null;
+        (async () => {
+            await audioCtx.audioWorklet.addModule(
+                URL.createObjectURL(new Blob([document.getElementById("pcm-player-js").innerText], { type: "application/javascript" }))
+            );
+            await audioCtx.audioWorklet.addModule(
+                URL.createObjectURL(new Blob([document.getElementById("pcm-capture-js").innerText], { type: "application/javascript" }))
+            );
+            txNode = new AudioWorkletNode(
+                audioCtx,
+                "pcm-player",
+            );
+            rxNode = new AudioWorkletNode(
+                audioCtx,
+                "pcm-capture",
+            );
+            txNode.connect(audioCtx.destination);
+            rxNode.port.postMessage({ "type": "samplerate", "value": audioCtx.sampleRate });
+        })();
+        var mediaStack, mediaSource;
+
+        function setconf() {
+            if (!ws || ws.readyState != WebSocket.OPEN) return;
+            let s = textEncoder.encode(document.getElementById("setconf").value);
+            let ab = new ArrayBuffer(s.length + 1);
+            let u8a = new Uint8Array(ab);
+            u8a[0] = 0x1A;
+            u8a.set(s, 1);
+            ws.send(u8a);
+        }
+
+        var rxCache = [];
+        var rxLen = 0;
+        function pushAudio(buf) {
+            rxCache.push(buf);
+            rxLen += buf.length;
+            if (rxLen >= audioCtx.sampleRate * 0.1) {
+                const merged = new Float32Array(rxLen);
+                let off = 0;
+                for (let b of rxCache) {
+                    merged.set(b, off);
+                    off += b.length;
+                }
+                txNode.port.postMessage(merged);
+                rxCache = [];
+                rxLen = 0;
+            }
+        }
+
+        function wsOnMessage(event) {
+            let d = new Uint8Array(event.data);
+            switch (d[0]) {
+                case 0x01: // verify
+                    let ab1 = textEncoder.encode(document.getElementById("username").value + ":");
+                    let ab2 = textEncoder.encode(":" + document.getElementById("passkey").value);
+                    let ab = new ArrayBuffer(ab1.length + ab2.length + d.length - 1);
+                    let u8a = new Uint8Array(ab);
+                    u8a.set(ab1);
+                    u8a.set(d.slice(1), ab1.length);
+                    u8a.set(ab2, ab1.length + d.length - 1);
+                    let md5RstStr = md5(u8a);
+                    let md5RstBuf = new ArrayBuffer(16);
+                    let md5Rst = new Uint8Array(md5RstBuf);
+                    for (let i = 0; i < 16; i++) {
+                        md5Rst[i] = parseInt(md5RstStr.slice(2 * i, 2 * i + 2), 16);
+                    }
+                    ws.send(md5Rst);
+                    return;
+                case 0x02: // refused
+                    ws.close();
+                    document.getElementById("wsstat").innerText = "连接断开";
+                    alert("server refused the connection.");
+                    return;
+                case 0x03: // busy
+                    ws.close();
+                    document.getElementById("wsstat").innerText = "连接断开";
+                    alert("server returned: the connection is busy. please wait a minute");
+                    return;
+                case 0x13: // pcm begin
+                    document.getElementById("datastat").innerText = "接收音频";
+                    return;
+                case 0x14: // pcm end
+                    document.getElementById("datafrom").innerText = "";
+                    document.getElementById("datastat").innerText = "接收音频完成";
+                    return;
+                case 0x17: // img begin
+                    imgDataArr = [];
+                    imgDataTotalLen = 0;
+                    document.getElementById("datastat").innerText = "接收图片";
+                    return;
+                case 0x18: // img end
+                    document.getElementById("datafrom").innerText = "";
+                    let b64s = "";
+                    for (let a of imgDataArr) {
+                        for (let i = 0; i < a.length; i++) {
+                            b64s += String.fromCharCode(a[i]);
+                        }
+                    }
+                    let pElement = document.createElement("p");
+                    pElement.innerHTML = `${Date().toLocaleString()} <img src="data:image/jpeg;base64,${btoa(b64s)}">`;
+                    document.getElementById("outputs").prepend(pElement);
+                    imgDataArr = [];
+                    imgDataTotalLen = 0;
+                    document.getElementById("datastat").innerText = "接收图片完成";
+                    return;
+                case 0x1C: // from
+                    document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(1));
+                    return;
+                case 0x1D: // online
+                    let pOnline = document.createElement("p");
+                    pOnline.innerHTML = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(1))}`;
+                    document.getElementById("outputs").prepend(pOnline);
+                    return;
+                case 0x1E: // offline
+                    let pOffline = document.createElement("p");
+                    pOffline.innerHTML = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(1))}`;
+                    document.getElementById("outputs").prepend(pOffline);
+                    return;
+                case 0x31: // stat nil img
+                    let pStatImgNil = document.createElement("p");
+                    pStatImgNil.innerHTML = `${Date().toLocaleString()} get error: nil image.`;
+                    document.getElementById("outputs").prepend(pStatImgNil);
+                    return;
+                case 0x32: // stat set config ok
+                    let pStatSetConf = document.createElement("p");
+                    pStatSetConf.innerHTML = `${Date().toLocaleString()} status: set config ok.`;
+                    document.getElementById("outputs").prepend(pStatSetConf);
+                    return;
+                case 0x33: // stat set config error
+                    let pStatErrSetConf = document.createElement("p");
+                    pStatErrSetConf.innerHTML = `${Date().toLocaleString()} get error: failed to set config.`;
+                    document.getElementById("outputs").prepend(pStatErrSetConf);
+                    return;
+                case 0x51: // pcm data
+                    const inputSamples = (d.length - 1) / 2;
+                    const view = new DataView(d.buffer, d.byteOffset + 1, inputSamples * 2);
+                    const ratio = 16000 / audioCtx.sampleRate;
+                    const outLength = Math.floor(inputSamples / ratio);
+                    const out = new Float32Array(outLength);
+                    let pos = 0;
+                    for (let i = 0; i < outLength; i++) { // 重采样
+                        const idx = Math.floor(pos);
+                        const frac = pos - idx;
+                        const s1 = view.getInt16(idx * 2, true) / 32768;
+                        const s2 = (idx + 1 < inputSamples)
+                            ? view.getInt16((idx + 1) * 2, true) / 32768
+                            : s1;
+                        out[i] = s1 + (s2 - s1) * frac;
+                        pos += ratio;
+                    }
+                    pushAudio(out);
+                    return;
+                case 0x61: // img data
+                    imgDataArr.push(d.slice(1));
+                    return;
+            }
+        }
+
+        function startWs() {
+            if (ws && ws.readyState == WebSocket.OPEN) return;
+            try {
+                ws = new WebSocket(document.getElementById("address").value);
+            } catch (e) {
+                alert("ws connect error: " + e.message);
+                return;
+            }
+            document.getElementById('onconn').hidden = false;
+            ws.binaryType = "arraybuffer";
+            ws.onerror = (e) => {
+                document.getElementById("wsstat").innerText = "连接断开";
+                alert("ws error: " + e);
+                ws.close();
+                ws = null;
+            }
+            ws.onclose = () => {
+                document.getElementById("wsstat").innerText = "连接断开";
+                document.getElementById("outputs").innerHTML = "";
+                document.getElementById('onconn').hidden = true;
+                alert("ws connection closed.");
+                ws = null;
+            }
+            ws.onmessage = wsOnMessage;
+            ws.onopen = async () => {
+                await audioCtx.resume();
+                document.getElementById("wsstat").innerText = "已连接";
+                ws.send(textEncoder.encode(document.getElementById("username").value));
+            }
+        }
+
+        function ptt(stat) {
+            pttStat = stat;
+            if (rxNode) {
+                rxNode.port.postMessage({
+                    type: "ptt",
+                    value: stat
+                });
+            }
+            if (stat) {
+                // ptt on
+                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x11]));
+                document.getElementById("datastat").innerText = "发送音频";
+                document.getElementById("ptt").innerText = "单击停止";
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then((stream) => {
+                        mediaStack = stream
+                        mediaSource = audioCtx.createMediaStreamSource(stream)
+                        mediaSource.connect(rxNode);
+                        rxNode.port.onmessage = (ev) => {
+                            if (ev.data.type == "buffer" && ws && ws.readyState === 1) { ws.send(ev.data.value); }
+                        };
+                    })
+                    .catch((err) => { alert('media error: ' + err.message); });
+            } else {
+                // ptt off
+                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x12]));
+                document.getElementById("datastat").innerText = "发送音频完成";
+                document.getElementById("ptt").innerText = "单击发射";
+                if (mediaStack) mediaStack.getTracks()[0].stop()
+            }
+        }
+    </script>
+</body>
+
+</html>

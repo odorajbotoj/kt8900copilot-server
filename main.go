@@ -2,10 +2,14 @@ package main
 
 import (
 	"crypto/tls"
+	_ "embed"
 	"flag"
 	"log"
 	"net/http"
 )
+
+//go:embed web/talk.html
+var simpleClient []byte
 
 func main() {
 	certPath := flag.String("cert", "cert.pem", "cert.pem path")
@@ -26,6 +30,9 @@ func main() {
 	loadClients()
 
 	http.HandleFunc("/ws", wsCallback)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(simpleClient)
+	})
 
 	log.Println("server starting ...")
 	if err := http.Serve(listener, nil); err != nil {

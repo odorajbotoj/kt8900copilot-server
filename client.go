@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 )
 
 const (
@@ -21,6 +22,7 @@ type Client struct {
 	Passkey           string // client key
 	IgnoreFromChannel []int
 	IgnoreFromWs      []int
+	activated         bool
 	chanFromWs        chan []byte
 	chanToWs          chan []byte
 	chanIn            chan dataPack
@@ -76,18 +78,11 @@ func (c *Client) initAndServe() {
 	for {
 		select {
 		case p := <-c.chanIn:
-			skip := false
-			for _, v := range c.IgnoreFromChannel {
-				if int(p.data[0]) == v {
-					log.Printf("%s ignored data from channel %d\n", c.ClientId, v)
-					skip = true
-					break
-				}
-			}
+			skip := slices.Contains(c.IgnoreFromChannel, int(p.data[0]))
 			if skip {
 				continue
 			}
-			log.Printf("%s received data from channel %d\n", c.ClientId, p.data[0])
+			// log.Printf("%s received data from channel %d\n", c.ClientId, p.data[0])
 			switch p.data[0] {
 			case RX:
 				setFrom(c, &p)
@@ -120,18 +115,11 @@ func (c *Client) initAndServe() {
 				}
 			}
 		case b := <-c.chanFromWs:
-			skip := false
-			for _, v := range c.IgnoreFromWs {
-				if int(b[0]) == v {
-					log.Printf("%s ignored data from ws %d\n", c.ClientId, v)
-					skip = true
-					break
-				}
-			}
+			skip := slices.Contains(c.IgnoreFromWs, int(b[0]))
 			if skip {
 				continue
 			}
-			log.Printf("%s received data from ws %d\n", c.ClientId, b[0])
+			// log.Printf("%s received data from ws %d\n", c.ClientId, b[0])
 			for _, oc := range c.outClientsPtrs {
 				if len(oc.chanIn) < cap(oc.chanIn) {
 					bCopy := make([]byte, len(b))
