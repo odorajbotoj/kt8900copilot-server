@@ -1,29 +1,29 @@
 package main
 
 const (
-	SKIP              = iota
-	VERIFY                               // s -> c
-	REFUSE                               // s -> c
-	BUSY                                 // s -> c
-	RX                = iota - 4 + 0x11  // c -> s
-	RX_STOP                              // c -> s
-	TX                                   // s -> c
-	TX_STOP                              // s -> c
-	IMG_UPLOAD                           // c -> s
-	IMG_UPLOAD_STOP                      // c -> s
-	IMG_DOWNLOAD                         // s -> c
-	IMG_DOWNLOAD_STOP                    // s -> c
-	IMG_GET                              // c -> s -> c
-	SET_CONF                             // c -> s -> c
-	RESET                                // c -> s -> c
-	FROM                                 // s -> c
-	ONLINE                               // s -> c
-	OFFLINE                              // s -> c
-	S_E_IMG_NIL       = iota - 13 + 0x31 // c -> s -> c
-	S_S_SET_CONF                         // c -> s -> c
-	S_E_SET_CONF                         // c -> s -> c
-	PCM               = 0x51             // c -> s -> c
-	IMG               = 0x61             // c -> s -> c
+	SKIP              = 0x00
+	VERIFY            = 0x01 // s -> c
+	REFUSE            = 0x02 // s -> c
+	BUSY              = 0x03 // s -> c
+	RX                = 0x11 // c -> s
+	RX_STOP           = 0x12 // c -> s
+	TX                = 0x13 // s -> c
+	TX_STOP           = 0x14 // s -> c
+	IMG_UPLOAD        = 0x15 // c -> s
+	IMG_UPLOAD_STOP   = 0x16 // c -> s
+	IMG_DOWNLOAD      = 0x17 // s -> c
+	IMG_DOWNLOAD_STOP = 0x18 // s -> c
+	IMG_GET           = 0x19 // c -> s -> c
+	SET_CONF          = 0x1A // c -> s -> c
+	RESET             = 0x1B // c -> s -> c
+	FROM              = 0x1C // s -> c
+	ONLINE            = 0x1D // s -> c
+	OFFLINE           = 0x1E // s -> c
+	S_E_IMG_NIL       = 0x31 // c -> s -> c
+	S_S_SET_CONF      = 0x32 // c -> s -> c
+	S_E_SET_CONF      = 0x33 // c -> s -> c
+	PCM               = 0x51 // c -> s -> c
+	IMG               = 0x61 // c -> s -> c
 )
 
 type dataPack struct {
