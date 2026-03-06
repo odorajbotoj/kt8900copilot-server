@@ -37,6 +37,7 @@
             <p><span>数据状态: </span><span id="datastat"></span></p>
         </div>
         <div>
+            <hr>
             <div>
                 <button
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x19]));">拍照</button>
@@ -50,7 +51,11 @@
                 <button
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B]));">重启ESP32</button>
             </div>
-            <button id="ptt" onclick="ptt(!pttStat);">单击发射</button>
+            <hr>
+            <div>
+                <button id="ptt" onclick="ptt(!pttStat);" style="width: 100dvw; height: 10dvh;">单击发射</button>
+            </div>
+            <hr>
         </div>
     </div>
     <div id="outputs"></div>
@@ -294,6 +299,11 @@
                     let pStatErrSetConf = document.createElement("p");
                     pStatErrSetConf.innerHTML = `${Date().toLocaleString()} get error: failed to set config.`;
                     document.getElementById("outputs").prepend(pStatErrSetConf);
+                    return;
+                case 0x34: // stat set config error
+                    let pStatErrCamDisabled = document.createElement("p");
+                    pStatErrCamDisabled.innerHTML = `${Date().toLocaleString()} get error: camera is not enabled.`;
+                    document.getElementById("outputs").prepend(pStatErrCamDisabled);
                     return;
                 case 0x51: // pcm data
                     const inputSamples = (d.length - 1) / 2;

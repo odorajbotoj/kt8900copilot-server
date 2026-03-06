@@ -22,6 +22,7 @@ const (
 	S_E_IMG_NIL       = 0x31 // c -> s -> c
 	S_S_SET_CONF      = 0x32 // c -> s -> c
 	S_E_SET_CONF      = 0x33 // c -> s -> c
+	S_E_CAM_DISABLED  = 0x34 // c -> s -> c
 	PCM               = 0x51 // c -> s -> c
 	IMG               = 0x61 // c -> s -> c
 )
