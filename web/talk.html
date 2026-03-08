@@ -48,6 +48,11 @@
                 <button onclick="setconf();">更新配置</button>
             </div>
             <div>
+                <label for="play">预录制文件: </label>
+                <input id="play" type="text">
+                <button onclick="play();">播放声音</button>
+            </div>
+            <div>
                 <button
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B]));">重启ESP32</button>
             </div>
@@ -197,6 +202,15 @@
             u8a.set(s, 1);
             ws.send(u8a);
         }
+        function play() {
+            if (!ws || ws.readyState != WebSocket.OPEN) return;
+            let s = textEncoder.encode(document.getElementById("play").value);
+            let ab = new ArrayBuffer(s.length + 1);
+            let u8a = new Uint8Array(ab);
+            u8a[0] = 0x1C;
+            u8a.set(s, 1);
+            ws.send(u8a);
+        }
 
         var rxCache = [];
         var rxLen = 0;
@@ -272,38 +286,52 @@
                     imgDataTotalLen = 0;
                     document.getElementById("datastat").innerText = "接收图片完成";
                     return;
+                case 0x31:
+                    let pMessage = document.createElement("p");
+                    pMessage.innerText = `${Date().toLocaleString()} status: set config ok.`;
+                    return;
+                case 0x32: // stat set config ok
+                    let pStatSetConf = document.createElement("p");
+                    pStatSetConf.innerText = `${Date().toLocaleString()} status: set config ok.`;
+                    document.getElementById("outputs").prepend(pStatSetConf);
+                    return;
+                case 0x33: // stat set config error
+                    let pStatErrSetConf = document.createElement("p");
+                    pStatErrSetConf.innerText = `${Date().toLocaleString()} get error: failed to set config.`;
+                    document.getElementById("outputs").prepend(pStatErrSetConf);
+                    return;
+                case 0x34: // stat set config error
+                    let pStatErrCamDisabled = document.createElement("p");
+                    pStatErrCamDisabled.innerText = `${Date().toLocaleString()} get error: camera is not enabled.`;
+                    document.getElementById("outputs").prepend(pStatErrCamDisabled);
+                    return;
+                case 0x35: // stat nil img
+                    let pStatImgNil = document.createElement("p");
+                    pStatImgNil.innerText = `${Date().toLocaleString()} get error: nil image.`;
+                    document.getElementById("outputs").prepend(pStatImgNil);
+                    return;
+                case 0x36: // play ok
+                    let pStatPlay = document.createElement("p");
+                    pStatPlay.innerText = `${Date().toLocaleString()} status: play sounds ok.`;
+                    document.getElementById("outputs").prepend(pStatPlay);
+                    return;
+                case 0x37: // play error
+                    let pStatErrPlay = document.createElement("p");
+                    pStatErrPlay.innerText = `${Date().toLocaleString()} get error: failed to play sounds.`;
+                    document.getElementById("outputs").prepend(pStatErrPlay);
+                    return;
                 case 0x51: // from
                     document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(1));
                     return;
                 case 0x52: // online
                     let pOnline = document.createElement("p");
-                    pOnline.innerHTML = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(1))}`;
+                    pOnline.innerText = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(1))}`;
                     document.getElementById("outputs").prepend(pOnline);
                     return;
                 case 0x53: // offline
                     let pOffline = document.createElement("p");
-                    pOffline.innerHTML = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(1))}`;
+                    pOffline.innerText = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(1))}`;
                     document.getElementById("outputs").prepend(pOffline);
-                    return;
-                case 0x31: // stat nil img
-                    let pStatImgNil = document.createElement("p");
-                    pStatImgNil.innerHTML = `${Date().toLocaleString()} get error: nil image.`;
-                    document.getElementById("outputs").prepend(pStatImgNil);
-                    return;
-                case 0x32: // stat set config ok
-                    let pStatSetConf = document.createElement("p");
-                    pStatSetConf.innerHTML = `${Date().toLocaleString()} status: set config ok.`;
-                    document.getElementById("outputs").prepend(pStatSetConf);
-                    return;
-                case 0x33: // stat set config error
-                    let pStatErrSetConf = document.createElement("p");
-                    pStatErrSetConf.innerHTML = `${Date().toLocaleString()} get error: failed to set config.`;
-                    document.getElementById("outputs").prepend(pStatErrSetConf);
-                    return;
-                case 0x34: // stat set config error
-                    let pStatErrCamDisabled = document.createElement("p");
-                    pStatErrCamDisabled.innerHTML = `${Date().toLocaleString()} get error: camera is not enabled.`;
-                    document.getElementById("outputs").prepend(pStatErrCamDisabled);
                     return;
                 case 0x71: // pcm data
                     const inputSamples = (d.length - 1) / 2;
@@ -348,7 +376,7 @@
             }
             ws.onclose = () => {
                 document.getElementById("wsstat").innerText = "连接断开";
-                document.getElementById("outputs").innerHTML = "";
+                document.getElementById("outputs").innerText = "";
                 document.getElementById('onconn').hidden = true;
                 alert("ws connection closed.");
                 ws = null;
