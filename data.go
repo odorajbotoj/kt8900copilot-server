@@ -16,15 +16,15 @@ const (
 	IMG_GET           = 0x19 // c -> s -> c
 	SET_CONF          = 0x1A // c -> s -> c
 	RESET             = 0x1B // c -> s -> c
-	FROM              = 0x1C // s -> c
-	ONLINE            = 0x1D // s -> c
-	OFFLINE           = 0x1E // s -> c
+	FROM              = 0x51 // s -> c
+	ONLINE            = 0x52 // s -> c
+	OFFLINE           = 0x53 // s -> c
 	S_E_IMG_NIL       = 0x31 // c -> s -> c
 	S_S_SET_CONF      = 0x32 // c -> s -> c
 	S_E_SET_CONF      = 0x33 // c -> s -> c
 	S_E_CAM_DISABLED  = 0x34 // c -> s -> c
-	PCM               = 0x51 // c -> s -> c
-	IMG               = 0x61 // c -> s -> c
+	PCM               = 0x71 // c -> s -> c
+	IMG               = 0x81 // c -> s -> c
 )
 
 type dataPack struct {

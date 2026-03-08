@@ -114,7 +114,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		log.Printf("[%d] connection closed.\n", connId)
 		conn.Close()
-		b := []byte{0x1E}
+		b := []byte{OFFLINE}
 		if c != nil {
 			c.chanFromWs <- append(b, c.ClientName...)
 			c.activated = false
@@ -139,7 +139,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[%d] connection closed: verifying failed or connection busy.\n", connId)
 			return
 		}
-		b := []byte{0x1D}
+		b := []byte{ONLINE}
 		c.chanFromWs <- append(b, c.ClientName...)
 		errChan := make(chan error)
 		// read from conn

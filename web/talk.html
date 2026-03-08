@@ -142,7 +142,7 @@
                 if (this.written >= this.buffersize) {
                     const buffer = new ArrayBuffer(this.written * 2 + 1);
                     const view = new DataView(buffer);
-                    view.setUint8(0, 0x51);
+                    view.setUint8(0, 0x71);
                     let nw = 0;
                     for (let i = this.startindex; i != this.writeindex; i = (i + 1) % (this.buffersize * 2)) {
                         view.setInt16(nw * 2 + 1, this.ringbuffer[i], true);
@@ -272,15 +272,15 @@
                     imgDataTotalLen = 0;
                     document.getElementById("datastat").innerText = "接收图片完成";
                     return;
-                case 0x1C: // from
+                case 0x51: // from
                     document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(1));
                     return;
-                case 0x1D: // online
+                case 0x52: // online
                     let pOnline = document.createElement("p");
                     pOnline.innerHTML = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(1))}`;
                     document.getElementById("outputs").prepend(pOnline);
                     return;
-                case 0x1E: // offline
+                case 0x53: // offline
                     let pOffline = document.createElement("p");
                     pOffline.innerHTML = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(1))}`;
                     document.getElementById("outputs").prepend(pOffline);
@@ -305,7 +305,7 @@
                     pStatErrCamDisabled.innerHTML = `${Date().toLocaleString()} get error: camera is not enabled.`;
                     document.getElementById("outputs").prepend(pStatErrCamDisabled);
                     return;
-                case 0x51: // pcm data
+                case 0x71: // pcm data
                     const inputSamples = (d.length - 1) / 2;
                     const view = new DataView(d.buffer, d.byteOffset + 1, inputSamples * 2);
                     const ratio = 16000 / audioCtx.sampleRate;
@@ -324,7 +324,7 @@
                     }
                     pushAudio(out);
                     return;
-                case 0x61: // img data
+                case 0x81: // img data
                     imgDataArr.push(d.slice(1));
                     return;
             }
