@@ -18,7 +18,7 @@ esp32s3端见仓库 [odorajbotoj/kt8900copilot](https://github.com/odorajbotoj/k
 + 客户端 MAC 地址 ( 针对ESP32S3 )
 + 自己的输出连接到哪些客户端
 + 客户端验证密钥
-+ 忽略特定数据包
++ 忽略特定数据包 ( 10进制整数 )
 
 ```json
 {
