@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -142,6 +143,16 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 		b := []byte{ONLINE}
 		c.chanFromWs <- append(b, c.ClientName...)
 		errChan := make(chan error)
+		// set ping/pong
+		if c.ClientType == ClientTypeESP32 {
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			conn.SetPingHandler(func(appData string) error {
+				if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
+					return fmt.Errorf("cannot write pong message to conn: %v.", err)
+				}
+				return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			})
+		}
 		// read from conn
 		go func() {
 			for {

@@ -28,7 +28,7 @@ const (
 	ONLINE            = 0x52 // s -> c
 	OFFLINE           = 0x53 // s -> c
 	PCM               = 0x71 // c -> s -> c
-	IMG               = 0x81 // c -> s -> c
+	IMG               = 0x72 // c -> s -> c
 )
 
 type dataPack struct {

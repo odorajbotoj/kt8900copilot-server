@@ -58,7 +58,7 @@
             </div>
             <hr>
             <div>
-                <button id="ptt" onclick="ptt(!pttStat);" style="width: 100dvw; height: 10dvh;">单击发射</button>
+                <button id="ptt" onclick="ptt(!pttStat);" style="width: 10dvw; height: 10dvh;">单击发射</button>
             </div>
             <hr>
         </div>
@@ -352,7 +352,7 @@
                     }
                     pushAudio(out);
                     return;
-                case 0x81: // img data
+                case 0x72: // img data
                     imgDataArr.push(d.slice(1));
                     return;
             }

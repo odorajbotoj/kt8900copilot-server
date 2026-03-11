@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 )
 
@@ -12,18 +13,28 @@ import (
 var simpleClient []byte
 
 func main() {
+	ifTls := flag.Bool("tls", false, "enable tls (need cert & key)")
 	certPath := flag.String("cert", "cert.pem", "cert.pem path")
 	keyPath := flag.String("key", "key.pem", "key.pem path")
 	flag.Parse()
 	log.Println("kt8900copilot server - bg4qbf")
-	cert, err := tls.LoadX509KeyPair(*certPath, *keyPath)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	config := &tls.Config{Certificates: []tls.Certificate{cert}}
-	listener, err := tls.Listen("tcp", ":8900", config)
-	if err != nil {
-		log.Fatalln(err)
+	var listener net.Listener
+	if *ifTls {
+		cert, err := tls.LoadX509KeyPair(*certPath, *keyPath)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		config := &tls.Config{Certificates: []tls.Certificate{cert}}
+		listener, err = tls.Listen("tcp", ":8900", config)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	} else {
+		var err error
+		listener, err = net.Listen("tcp", ":8900")
+		if err != nil {
+			log.Fatalln(err)
+		}
 	}
 
 	appClients = make(map[string]*Client) // init
