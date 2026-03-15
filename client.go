@@ -58,7 +58,7 @@ func loadClients() {
 
 func setFrom(c *Client, p *dataPack) {
 	if c.ClientType == ClientTypeUser {
-		fb := []byte{FROM}
+		fb := []byte{FROM, uint8(len(p.from) & 0xFF), uint8((len(p.from) >> 8) & 0xFF)}
 		if len(c.chanToWs) < cap(c.chanToWs) {
 			c.chanToWs <- append(fb, p.from...)
 		}

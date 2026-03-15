@@ -5,6 +5,7 @@ const (
 	VERIFY            = 0x01 // s -> c
 	REFUSE            = 0x02 // s -> c
 	BUSY              = 0x03 // s -> c
+	VERIFIED          = 0x04 // s -> c
 	RX                = 0x11 // c -> s
 	RX_STOP           = 0x12 // c -> s
 	TX                = 0x13 // s -> c
@@ -17,6 +18,7 @@ const (
 	SET_CONF          = 0x1A // c -> s -> c
 	RESET             = 0x1B // c -> s -> c
 	PLAY              = 0x1C // c -> s -> c
+	AFSK              = 0x1D // c -> s -> c
 	S_MESSAGE         = 0x31 // c -> s -> c
 	S_S_SET_CONF      = 0x32 // c -> s -> c
 	S_E_SET_CONF      = 0x33 // c -> s -> c

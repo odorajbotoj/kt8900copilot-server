@@ -27,7 +27,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 		return
 	}
 	if msgType != websocket.BinaryMessage {
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid message type.", connId)
@@ -37,15 +37,16 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	var ok bool
 	*c, ok = appClients[string(p)]
 	if !ok {
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid client: %s.", connId, string(p))
 		close(doneCh)
 		return
 	}
+	log.Printf("[%d] got client id: %s\n", connId, string(p))
 	if (*c).activated {
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x03}); err != nil { // connection busy
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{BUSY, 0, 0}); err != nil { // connection busy
 			log.Printf("[%d] conn busy: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: client busy.", connId)
@@ -56,7 +57,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	// step 2. ask for verify
 	r1 := rand.New(rand.NewSource(time.Now().UnixMicro())).Uint64()
 	r2 := rand.New(rand.NewSource(time.Now().UnixMicro())).Uint64()
-	verifyBytes := []byte{0x01,
+	verifyBytes := []byte{VERIFY, 0x10, 0x00,
 		byte(r1 & 0xFF), byte(r1 >> 8 & 0xFF), byte(r1 >> 16 & 0xFF), byte(r1 >> 24 & 0xFF),
 		byte(r1 >> 32 & 0xFF), byte(r1 >> 40 & 0xFF), byte(r1 >> 48 & 0xFF), byte(r1 >> 56 & 0xFF),
 		byte(r2 >> 56 & 0xFF), byte(r2 >> 48 & 0xFF), byte(r2 >> 40 & 0xFF), byte(r2 >> 32 & 0xFF),
@@ -70,7 +71,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	var beforeMd5 []byte
 	beforeMd5 = append(beforeMd5, (*c).ClientId...)
 	beforeMd5 = append(beforeMd5, ':')
-	beforeMd5 = append(beforeMd5, verifyBytes[1:]...)
+	beforeMd5 = append(beforeMd5, verifyBytes[3:]...)
 	beforeMd5 = append(beforeMd5, ':')
 	beforeMd5 = append(beforeMd5, (*c).Passkey...)
 	afterMd5 := md5.Sum(beforeMd5)
@@ -81,7 +82,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 		return
 	}
 	if msgType != websocket.BinaryMessage || len(p) != 16 {
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: invalid verifying response.", connId)
@@ -89,7 +90,7 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 		return
 	}
 	if !bytes.Equal(afterMd5[:], p) {
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] verifying error: unequal verifying response.", connId)
@@ -101,6 +102,9 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 	}
 	close(doneCh)
 	*rst = true
+	if err := conn.WriteMessage(websocket.BinaryMessage, []byte{VERIFIED, 0, 0}); err != nil {
+		log.Printf("[%d] device verified: conn write error: %v\n", connId, err)
+	}
 	log.Printf("[%d] device verified: %s\n", connId, (*c).ClientName)
 }
 
@@ -115,7 +119,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		log.Printf("[%d] connection closed.\n", connId)
 		conn.Close()
-		b := []byte{OFFLINE}
+		b := []byte{OFFLINE, uint8(len(c.ClientName) & 0xFF), uint8((len(c.ClientName) >> 8) & 0xFF)}
 		if c != nil {
 			c.chanFromWs <- append(b, c.ClientName...)
 			c.activated = false
@@ -130,7 +134,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case <-time.After(20 * time.Second):
-		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{0x02}); err != nil { // refuse connection
+		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
 		log.Printf("[%d] connection closed: client verifying timeout\n", connId)
@@ -140,7 +144,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[%d] connection closed: verifying failed or connection busy.\n", connId)
 			return
 		}
-		b := []byte{ONLINE}
+		b := []byte{ONLINE, uint8(len(c.ClientName) & 0xFF), uint8((len(c.ClientName) >> 8) & 0xFF)}
 		c.chanFromWs <- append(b, c.ClientName...)
 		errChan := make(chan error)
 		// set ping/pong

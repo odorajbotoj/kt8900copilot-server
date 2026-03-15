@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>kt8900copilot client by BG4QBF</title>
     <script src="https://cdn.jsdelivr.net/npm/js-md5@0.8.3/build/md5.min.js"></script>
+    <script src="https://unpkg.com/pinyin-pro"></script>
 </head>
 
 <body>
@@ -40,7 +41,7 @@
             <hr>
             <div>
                 <button
-                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x19]));">拍照</button>
+                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x19, 0x00, 0x00]));">拍照</button>
             </div>
             <div>
                 <label for="setconf">配置项: </label>
@@ -53,8 +54,29 @@
                 <button onclick="play();">播放声音</button>
             </div>
             <div>
+                <button onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([
+                    0x1D, 0x71, 0x00,
+                    0x02,
+                    0x11, 0x41, 0x50, 0x52, 0x53, 0x20, 0x20, 0x00,
+                    0x12, 0x42, 0x47, 0x34, 0x51, 0x42, 0x46, 0x07,
+                    0x13, 0x57, 0x49, 0x44, 0x45, 0x31, 0x20, 0x01,
+                    0x13, 0x57, 0x49, 0x44, 0x45, 0x32, 0x20, 0x01,
+                    0x14,
+                    0x3a, 0x42, 0x47, 0x34, 0x51, 0x42, 0x46, 0x20,
+                    0x20, 0x20, 0x3a, 0x48, 0x69, 0x20, 0x54, 0x68,
+                    0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x42, 0x47,
+                    0x34, 0x51, 0x42, 0x46, 0x20, 0x74, 0x68, 0x69,
+                    0x73, 0x20, 0x69, 0x73, 0x20, 0x61, 0x20, 0x74,
+                    0x65, 0x73, 0x74, 0x20, 0x6d, 0x65, 0x73, 0x73,
+                    0x61, 0x67, 0x65, 0x20, 0x65, 0x6e, 0x63, 0x6f,
+                    0x64, 0x69, 0x6e, 0x67, 0x20, 0x62, 0x79, 0x20,
+                    0x61, 0x6e, 0x20, 0x45, 0x53, 0x50, 0x33, 0x32,
+                    0x53, 0x33, 0x2e, 0x7b, 0x30, 0x30, 0x31
+                    ]));">test aprs</button>
+            </div>
+            <div>
                 <button
-                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B]));">重启ESP32</button>
+                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B, 0x00, 0x00]));">重启ESP32</button>
             </div>
             <hr>
             <div>
@@ -145,12 +167,13 @@
                 }
 
                 if (this.written >= this.buffersize) {
-                    const buffer = new ArrayBuffer(this.written * 2 + 1);
+                    const buffer = new ArrayBuffer(this.written * 2 + 3);
                     const view = new DataView(buffer);
                     view.setUint8(0, 0x71);
+                    view.setUint16(1, this.written * 2, true);
                     let nw = 0;
                     for (let i = this.startindex; i != this.writeindex; i = (i + 1) % (this.buffersize * 2)) {
-                        view.setInt16(nw * 2 + 1, this.ringbuffer[i], true);
+                        view.setInt16(nw * 2 + 3, this.ringbuffer[i], true);
                         nw++
                     }
                     this.port.postMessage({ "type": "buffer", "value": buffer });
@@ -164,6 +187,7 @@
         registerProcessor("pcm-capture", PCMCapture);
     </script>
     <script>
+        // console.log(pinyinPro.pinyin("测试拼音12abc3 // 1/1", { toneType: "num", type: "array" }));
         var pttStat = false;
         var ws = null;
         const textEncoder = new TextEncoder();
@@ -196,19 +220,47 @@
         function setconf() {
             if (!ws || ws.readyState != WebSocket.OPEN) return;
             let s = textEncoder.encode(document.getElementById("setconf").value);
-            let ab = new ArrayBuffer(s.length + 1);
+            let ab = new ArrayBuffer(s.length + 3);
             let u8a = new Uint8Array(ab);
             u8a[0] = 0x1A;
-            u8a.set(s, 1);
+            u8a[1] = s.length & 0xFF;
+            u8a[2] = (s.length >> 8) & 0xFF;
+            u8a.set(s, 3);
             ws.send(u8a);
         }
         function play() {
             if (!ws || ws.readyState != WebSocket.OPEN) return;
-            let s = textEncoder.encode(document.getElementById("play").value);
-            let ab = new ArrayBuffer(s.length + 1);
+            let py = pinyinPro.pinyin(document.getElementById("play").value, { toneType: "num", type: "array" });
+            for (let i in py) {
+                if (py[i] == "?") {
+                    py[i] = "wd-cq";
+                } else if (py[i] == "!") {
+                    py[i] = "wd-73";
+                } else if (py[i] == "(") {
+                    py[i] = "wd-qsl1";
+                } else if (py[i] == ")") {
+                    py[i] = "wd-qsl2";
+                } else if (py[i] == "^") {
+                    py[i] = "wd-sat";
+                } else if (py[i] == ":") {
+                    py[i] = "wd-thisis";
+                } else if (py[i] == "@") {
+                    py[i] = "wd-qrz";
+                } else if (py[i] == "$") {
+                    py[i] = "wd-thankyou";
+                } else if (py[i] == ",") {
+                    py[i] = "mute-05";
+                } else if (/^[a-z]$/.test(py[i])) {
+                    py[i] = "pa-" + py[i];
+                }
+            }
+            let s = textEncoder.encode(py.join("/"));
+            let ab = new ArrayBuffer(s.length + 3);
             let u8a = new Uint8Array(ab);
             u8a[0] = 0x1C;
-            u8a.set(s, 1);
+            u8a[1] = s.length & 0xFF;
+            u8a[2] = (s.length >> 8) & 0xFF;
+            u8a.set(s, 3);
             ws.send(u8a);
         }
 
@@ -236,11 +288,11 @@
                 case 0x01: // verify
                     let ab1 = textEncoder.encode(document.getElementById("username").value + ":");
                     let ab2 = textEncoder.encode(":" + document.getElementById("passkey").value);
-                    let ab = new ArrayBuffer(ab1.length + ab2.length + d.length - 1);
+                    let ab = new ArrayBuffer(ab1.length + ab2.length + d.length - 3);
                     let u8a = new Uint8Array(ab);
                     u8a.set(ab1);
-                    u8a.set(d.slice(1), ab1.length);
-                    u8a.set(ab2, ab1.length + d.length - 1);
+                    u8a.set(d.slice(3), ab1.length);
+                    u8a.set(ab2, ab1.length + d.length - 3);
                     let md5RstStr = md5(u8a);
                     let md5RstBuf = new ArrayBuffer(16);
                     let md5Rst = new Uint8Array(md5RstBuf);
@@ -258,6 +310,11 @@
                     ws.close();
                     document.getElementById("wsstat").innerText = "连接断开";
                     alert("server returned: the connection is busy. please wait a minute");
+                    return;
+                case 0x04: // verified
+                    let pVerified = document.createElement("p");
+                    pVerified.innerText = `${Date().toLocaleString()} 连接已验证.`;
+                    document.getElementById("outputs").prepend(pVerified);
                     return;
                 case 0x13: // pcm begin
                     document.getElementById("datastat").innerText = "接收音频";
@@ -285,10 +342,6 @@
                     imgDataArr = [];
                     imgDataTotalLen = 0;
                     document.getElementById("datastat").innerText = "接收图片完成";
-                    return;
-                case 0x31:
-                    let pMessage = document.createElement("p");
-                    pMessage.innerText = `${Date().toLocaleString()} status: set config ok.`;
                     return;
                 case 0x32: // stat set config ok
                     let pStatSetConf = document.createElement("p");
@@ -321,21 +374,21 @@
                     document.getElementById("outputs").prepend(pStatErrPlay);
                     return;
                 case 0x51: // from
-                    document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(1));
+                    document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(3));
                     return;
                 case 0x52: // online
                     let pOnline = document.createElement("p");
-                    pOnline.innerText = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(1))}`;
+                    pOnline.innerText = `${Date().toLocaleString()} client online: ${textDecoder.decode(d.slice(3))}`;
                     document.getElementById("outputs").prepend(pOnline);
                     return;
                 case 0x53: // offline
                     let pOffline = document.createElement("p");
-                    pOffline.innerText = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(1))}`;
+                    pOffline.innerText = `${Date().toLocaleString()} client offline: ${textDecoder.decode(d.slice(3))}`;
                     document.getElementById("outputs").prepend(pOffline);
                     return;
                 case 0x71: // pcm data
-                    const inputSamples = (d.length - 1) / 2;
-                    const view = new DataView(d.buffer, d.byteOffset + 1, inputSamples * 2);
+                    const inputSamples = (d.length - 3) / 2;
+                    const view = new DataView(d.buffer, d.byteOffset + 3, inputSamples * 2);
                     const ratio = 16000 / audioCtx.sampleRate;
                     const outLength = Math.floor(inputSamples / ratio);
                     const out = new Float32Array(outLength);
@@ -353,7 +406,7 @@
                     pushAudio(out);
                     return;
                 case 0x72: // img data
-                    imgDataArr.push(d.slice(1));
+                    imgDataArr.push(d.slice(3));
                     return;
             }
         }
@@ -399,7 +452,7 @@
             }
             if (stat) {
                 // ptt on
-                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x11]));
+                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x11, 0x00, 0x00]));
                 document.getElementById("datastat").innerText = "发送音频";
                 document.getElementById("ptt").innerText = "单击停止";
                 navigator.mediaDevices.getUserMedia({ audio: true })
@@ -414,7 +467,7 @@
                     .catch((err) => { alert('media error: ' + err.message); });
             } else {
                 // ptt off
-                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x12]));
+                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x12, 0x00, 0x00]));
                 document.getElementById("datastat").innerText = "发送音频完成";
                 document.getElementById("ptt").innerText = "单击发射";
                 if (mediaStack) mediaStack.getTracks()[0].stop()
