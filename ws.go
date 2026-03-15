@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -18,7 +19,24 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(_ *http.Request) bool { return true },
 }
 
-func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan struct{}, rst *bool) {
+type safeConn struct {
+	Conn *websocket.Conn
+	lock sync.Mutex
+}
+
+func (conn *safeConn) ReadMessage() (int, []byte, error) {
+	return conn.Conn.ReadMessage()
+}
+func (conn *safeConn) WriteMessage(msgType int, data []byte) error {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
+	return conn.Conn.WriteMessage(msgType, data)
+}
+func (conn *safeConn) Close() error {
+	return conn.Conn.Close()
+}
+
+func verifyClient(connId int64, conn *safeConn, c **Client, doneCh chan struct{}, rst *bool) {
 	// step 1. check name (for esp32 is mac address)
 	msgType, p, err := conn.ReadMessage()
 	if err != nil {
@@ -111,11 +129,12 @@ func verifyClient(connId int64, conn *websocket.Conn, c **Client, doneCh chan st
 func wsCallback(w http.ResponseWriter, r *http.Request) {
 	var c *Client
 	connId := time.Now().UnixMilli()
-	conn, err := upgrader.Upgrade(w, r, nil)
+	wsc, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("[%d] failed to upgrade to websocket: %v\n", connId, err)
 		return
 	}
+	conn := &safeConn{wsc, sync.Mutex{}}
 	defer func() {
 		log.Printf("[%d] connection closed.\n", connId)
 		conn.Close()
@@ -149,12 +168,12 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 		errChan := make(chan error)
 		// set ping/pong
 		if c.ClientType == ClientTypeESP32 {
-			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-			conn.SetPingHandler(func(appData string) error {
+			wsc.SetReadDeadline(time.Now().Add(60 * time.Second))
+			wsc.SetPingHandler(func(appData string) error {
 				if err := conn.WriteMessage(websocket.PongMessage, nil); err != nil {
 					return fmt.Errorf("cannot write pong message to conn: %v.", err)
 				}
-				return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+				return wsc.SetReadDeadline(time.Now().Add(60 * time.Second))
 			})
 		}
 		// read from conn
