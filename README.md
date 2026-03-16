@@ -41,7 +41,13 @@ esp32s3端见仓库 [odorajbotoj/kt8900copilot](https://github.com/odorajbotoj/k
 }
 ```
 
-服务器需要 **TLS** , 可以使用 *Let's Encrypt* 等进行证书管理.
+## TLS
+
+服务器可选 **TLS** , 可以使用 *Let's Encrypt* 等进行证书管理.
+
++ 使用 `-tls` 开启 TLS
++ 使用 `-cert` 指定 **cert.pem** 路径
++ 使用 `-key` 指定 **key.pem** 路径
 
 ## AIGC 内容告知
 
