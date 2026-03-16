@@ -40,10 +40,6 @@
         <div>
             <hr>
             <div>
-                <button
-                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x19, 0x00, 0x00]));">拍照</button>
-            </div>
-            <div>
                 <label for="setconf">配置项: </label>
                 <input id="setconf" type="text">
                 <button onclick="setconf();">更新配置</button>
@@ -55,7 +51,7 @@
             </div>
             <div>
                 <button onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([
-                    0x1D, 0x71, 0x00,
+                    0x18, 0x71, 0x00,
                     0x02,
                     0x11, 0x41, 0x50, 0x52, 0x53, 0x20, 0x20, 0x00,
                     0x12, 0x42, 0x47, 0x34, 0x51, 0x42, 0x46, 0x07,
@@ -76,7 +72,7 @@
             </div>
             <div>
                 <button
-                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x1B, 0x00, 0x00]));">重启ESP32</button>
+                    onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x16, 0x00, 0x00]));">重启ESP32</button>
             </div>
             <hr>
             <div>
@@ -192,7 +188,6 @@
         var ws = null;
         const textEncoder = new TextEncoder();
         const textDecoder = new TextDecoder();
-        var imgDataArr = [];
 
         const audioCtx = new AudioContext();
         var txNode = null;
@@ -222,7 +217,7 @@
             let s = textEncoder.encode(document.getElementById("setconf").value);
             let ab = new ArrayBuffer(s.length + 3);
             let u8a = new Uint8Array(ab);
-            u8a[0] = 0x1A;
+            u8a[0] = 0x15;
             u8a[1] = s.length & 0xFF;
             u8a[2] = (s.length >> 8) & 0xFF;
             u8a.set(s, 3);
@@ -257,7 +252,7 @@
             let s = textEncoder.encode(py.join("/"));
             let ab = new ArrayBuffer(s.length + 3);
             let u8a = new Uint8Array(ab);
-            u8a[0] = 0x1C;
+            u8a[0] = 0x17;
             u8a[1] = s.length & 0xFF;
             u8a[2] = (s.length >> 8) & 0xFF;
             u8a.set(s, 3);
@@ -323,26 +318,6 @@
                     document.getElementById("datafrom").innerText = "";
                     document.getElementById("datastat").innerText = "接收音频完成";
                     return;
-                case 0x17: // img begin
-                    imgDataArr = [];
-                    imgDataTotalLen = 0;
-                    document.getElementById("datastat").innerText = "接收图片";
-                    return;
-                case 0x18: // img end
-                    document.getElementById("datafrom").innerText = "";
-                    let b64s = "";
-                    for (let a of imgDataArr) {
-                        for (let i = 0; i < a.length; i++) {
-                            b64s += String.fromCharCode(a[i]);
-                        }
-                    }
-                    let pElement = document.createElement("p");
-                    pElement.innerHTML = `${Date().toLocaleString()} <img src="data:image/jpeg;base64,${btoa(b64s)}">`;
-                    document.getElementById("outputs").prepend(pElement);
-                    imgDataArr = [];
-                    imgDataTotalLen = 0;
-                    document.getElementById("datastat").innerText = "接收图片完成";
-                    return;
                 case 0x32: // stat set config ok
                     let pStatSetConf = document.createElement("p");
                     pStatSetConf.innerText = `${Date().toLocaleString()} status: set config ok.`;
@@ -358,17 +333,12 @@
                     pStatErrCamDisabled.innerText = `${Date().toLocaleString()} get error: camera is not enabled.`;
                     document.getElementById("outputs").prepend(pStatErrCamDisabled);
                     return;
-                case 0x35: // stat nil img
-                    let pStatImgNil = document.createElement("p");
-                    pStatImgNil.innerText = `${Date().toLocaleString()} get error: nil image.`;
-                    document.getElementById("outputs").prepend(pStatImgNil);
-                    return;
-                case 0x36: // play ok
+                case 0x35: // play ok
                     let pStatPlay = document.createElement("p");
                     pStatPlay.innerText = `${Date().toLocaleString()} status: play sounds ok.`;
                     document.getElementById("outputs").prepend(pStatPlay);
                     return;
-                case 0x37: // play error
+                case 0x36: // play error
                     let pStatErrPlay = document.createElement("p");
                     pStatErrPlay.innerText = `${Date().toLocaleString()} get error: failed to play sounds.`;
                     document.getElementById("outputs").prepend(pStatErrPlay);
@@ -404,9 +374,6 @@
                         pos += ratio;
                     }
                     pushAudio(out);
-                    return;
-                case 0x72: // img data
-                    imgDataArr.push(d.slice(3));
                     return;
             }
         }

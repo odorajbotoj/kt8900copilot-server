@@ -96,18 +96,6 @@ func (c *Client) initAndServe() {
 			case TX_STOP:
 				c.nowReceiving = ""
 				p.data[0] = RX_STOP
-			case IMG_UPLOAD:
-				setFrom(c, &p)
-				p.data[0] = IMG_DOWNLOAD
-			case IMG_UPLOAD_STOP:
-				c.nowReceiving = ""
-				p.data[0] = IMG_DOWNLOAD_STOP
-			case IMG_DOWNLOAD:
-				setFrom(c, &p)
-				p.data[0] = IMG_UPLOAD
-			case IMG_DOWNLOAD_STOP:
-				c.nowReceiving = ""
-				p.data[0] = IMG_UPLOAD_STOP
 			}
 			if c.nowReceiving == "" || c.nowReceiving == p.from {
 				if len(c.chanToWs) < cap(c.chanToWs) {
