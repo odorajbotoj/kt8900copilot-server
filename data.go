@@ -20,6 +20,8 @@ const (
 	S_E_CAM_DISABLED = 0x34 // c -> s -> c
 	S_S_PLAY         = 0x35 // c -> s -> c
 	S_E_PLAY         = 0x36 // c -> s -> c
+	S_S_AFSK         = 0x37 // c -> s -> c
+	S_E_AFSK         = 0x38 // c -> s -> c
 	FROM             = 0x51 // s -> c
 	ONLINE           = 0x52 // s -> c
 	OFFLINE          = 0x53 // s -> c

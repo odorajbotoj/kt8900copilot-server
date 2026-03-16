@@ -44,32 +44,71 @@
                 <input id="setconf" type="text">
                 <button onclick="setconf();">更新配置</button>
             </div>
+            <hr>
             <div>
                 <label for="play">预录制文件: </label>
-                <input id="play" type="text">
+                <textarea id="play"></textarea>
+                <br>
                 <button onclick="play();">播放声音</button>
             </div>
+            <hr>
             <div>
-                <button onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([
-                    0x18, 0x71, 0x00,
-                    0x02,
-                    0x11, 0x41, 0x50, 0x52, 0x53, 0x20, 0x20, 0x00,
-                    0x12, 0x42, 0x47, 0x34, 0x51, 0x42, 0x46, 0x07,
-                    0x13, 0x57, 0x49, 0x44, 0x45, 0x31, 0x20, 0x01,
-                    0x13, 0x57, 0x49, 0x44, 0x45, 0x32, 0x20, 0x01,
-                    0x14,
-                    0x3a, 0x42, 0x47, 0x34, 0x51, 0x42, 0x46, 0x20,
-                    0x20, 0x20, 0x3a, 0x48, 0x69, 0x20, 0x54, 0x68,
-                    0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x42, 0x47,
-                    0x34, 0x51, 0x42, 0x46, 0x20, 0x74, 0x68, 0x69,
-                    0x73, 0x20, 0x69, 0x73, 0x20, 0x61, 0x20, 0x74,
-                    0x65, 0x73, 0x74, 0x20, 0x6d, 0x65, 0x73, 0x73,
-                    0x61, 0x67, 0x65, 0x20, 0x65, 0x6e, 0x63, 0x6f,
-                    0x64, 0x69, 0x6e, 0x67, 0x20, 0x62, 0x79, 0x20,
-                    0x61, 0x6e, 0x20, 0x45, 0x53, 0x50, 0x33, 0x32,
-                    0x53, 0x33, 0x2e, 0x7b, 0x30, 0x30, 0x31
-                    ]));">test aprs</button>
+                <div>
+                    <label for="tocall">TO CALL:</label>
+                    <input type="text" id="tocall">
+                    <input type="number" min="0" max="15" id="tocall-ssid">
+                </div>
+                <br>
+                <div>
+                    <label for="fromcall">FROM CALL:</label>
+                    <input type="text" id="fromcall">
+                    <input type="number" min="0" max="15" id="fromcall-ssid">
+                </div>
+                <br>
+                <div>
+                    <label for="path1">PATH 1:</label>
+                    <input type="text" id="path1">
+                    <input type="number" min="0" max="15" id="path1-ssid">
+                    <br>
+                    <label for="path2">PATH 2:</label>
+                    <input type="text" id="path2">
+                    <input type="number" min="0" max="15" id="path2-ssid">
+                    <br>
+                    <label for="path3">PATH 3:</label>
+                    <input type="text" id="path3">
+                    <input type="number" min="0" max="15" id="path3-ssid">
+                    <br>
+                    <label for="path4">PATH 4:</label>
+                    <input type="text" id="path4">
+                    <input type="number" min="0" max="15" id="path4-ssid">
+                    <br>
+                    <label for="path5">PATH 5:</label>
+                    <input type="text" id="path5">
+                    <input type="number" min="0" max="15" id="path5-ssid">
+                    <br>
+                    <label for="path6">PATH 6:</label>
+                    <input type="text" id="path6">
+                    <input type="number" min="0" max="15" id="path6-ssid">
+                    <br>
+                    <label for="path7">PATH 7:</label>
+                    <input type="text" id="path7">
+                    <input type="number" min="0" max="15" id="path7-ssid">
+                    <br>
+                    <label for="path8">PATH 8:</label>
+                    <input type="text" id="path8">
+                    <input type="number" min="0" max="15" id="path8-ssid">
+                </div>
+                <br>
+                <div>
+                    <label for="message">MESSAGE:</label>
+                    <textarea id="message"></textarea>
+                </div>
+                <br>
+                <div>
+                    <button onclick="aprs();">SEND APRS</button>
+                </div>
             </div>
+            <hr>
             <div>
                 <button
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x16, 0x00, 0x00]));">重启ESP32</button>
@@ -221,7 +260,7 @@
             u8a[1] = s.length & 0xFF;
             u8a[2] = (s.length >> 8) & 0xFF;
             u8a.set(s, 3);
-            ws.send(u8a);
+            if (ws && ws.readyState == WebSocket.OPEN) ws.send(u8a);
         }
         function play() {
             if (!ws || ws.readyState != WebSocket.OPEN) return;
@@ -256,7 +295,72 @@
             u8a[1] = s.length & 0xFF;
             u8a[2] = (s.length >> 8) & 0xFF;
             u8a.set(s, 3);
-            ws.send(u8a);
+            if (ws && ws.readyState == WebSocket.OPEN) ws.send(u8a);
+        }
+        function aprs() {
+            let a = [0x18, 0x00, 0x00, 0x02];
+            // tocall check
+            let c = document.getElementById("tocall").value.toUpperCase();
+            if (c.length > 6) {
+                alert("bad tocall");
+                return;
+            }
+            let ssid = parseInt(document.getElementById("tocall-ssid").value);
+            if (ssid < 0 || ssid > 15) {
+                alert("bad tocall ssid");
+                return;
+            }
+            a.push(0x11);
+            for (let i = 0; i < 6; i++) {
+                if (i < c.length) a.push(c.charCodeAt(i));
+                else a.push(0x20);
+            }
+            a.push(ssid);
+            // fromcall check
+            c = document.getElementById("fromcall").value.toUpperCase();
+            if (c.length > 6) {
+                alert("bad fromcall");
+                return;
+            }
+            ssid = parseInt(document.getElementById("fromcall-ssid").value);
+            if (ssid < 0 || ssid > 15) {
+                alert("bad fromcall ssid");
+                return
+            }
+            a.push(0x12);
+            for (let i = 0; i < 6; i++) {
+                if (i < c.length) a.push(c.charCodeAt(i));
+                else a.push(0x20);
+            }
+            a.push(ssid);
+            // path check
+            for (let p_i = 1; p_i <= 8; p_i++) {
+                c = document.getElementById(`path${p_i}`).value.toUpperCase();
+                if (c != "") {
+                    if (c.length > 6) {
+                        alert(`bad path${p_i}`);
+                        return;
+                    }
+                    ssid = parseInt(document.getElementById(`path${p_i}-ssid`).value);
+                    if (ssid < 0 || ssid > 15) {
+                        alert(`bad path${p_i} ssid`);
+                        return;
+                    }
+                    a.push(0x13);
+                    for (let i = 0; i < 6; i++) {
+                        if (i < c.length) a.push(c.charCodeAt(i));
+                        else a.push(0x20);
+                    }
+                    a.push(ssid);
+                }
+            }
+            // push msg
+            a.push(0x14);
+            let m = document.getElementById("message").value;
+            for (let i in m) { a.push(m.charCodeAt(i)); }
+            a[1] = (a.length - 3) & 0xFF;
+            a[2] = ((a.length - 3) >> 8) & 0xFF;
+            if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from(a));
         }
 
         var rxCache = [];
@@ -294,7 +398,7 @@
                     for (let i = 0; i < 16; i++) {
                         md5Rst[i] = parseInt(md5RstStr.slice(2 * i, 2 * i + 2), 16);
                     }
-                    ws.send(md5Rst);
+                    if (ws && ws.readyState == WebSocket.OPEN) ws.send(md5Rst);
                     return;
                 case 0x02: // refused
                     ws.close();
@@ -317,6 +421,11 @@
                 case 0x14: // pcm end
                     document.getElementById("datafrom").innerText = "";
                     document.getElementById("datastat").innerText = "接收音频完成";
+                    return;
+                case 0x31: // message
+                    let pMsg = document.createElement("p");
+                    pMsg.innerText = `${Date().toLocaleString()} message: ${textDecoder.decode(d.slice(3))}`;
+                    document.getElementById("outputs").prepend(pMsg);
                     return;
                 case 0x32: // stat set config ok
                     let pStatSetConf = document.createElement("p");
@@ -342,6 +451,16 @@
                     let pStatErrPlay = document.createElement("p");
                     pStatErrPlay.innerText = `${Date().toLocaleString()} get error: failed to play sounds.`;
                     document.getElementById("outputs").prepend(pStatErrPlay);
+                    return;
+                case 0x37: // afsk ok
+                    let pStatAFSK = document.createElement("p");
+                    pStatAFSK.innerText = `${Date().toLocaleString()} status: afsk send ok.`;
+                    document.getElementById("outputs").prepend(pStatAFSK);
+                    return;
+                case 0x38: // afsk error
+                    let pStatErrAFSK = document.createElement("p");
+                    pStatErrAFSK.innerText = `${Date().toLocaleString()} get error: failed to send afsk.`;
+                    document.getElementById("outputs").prepend(pStatErrAFSK);
                     return;
                 case 0x51: // from
                     document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(3));
@@ -375,6 +494,9 @@
                     }
                     pushAudio(out);
                     return;
+                default:
+                    console.log("unhandled: ", d[0]);
+                    return;
             }
         }
 
@@ -405,7 +527,7 @@
             ws.onopen = async () => {
                 await audioCtx.resume();
                 document.getElementById("wsstat").innerText = "已连接";
-                ws.send(textEncoder.encode(document.getElementById("username").value));
+                if (ws && ws.readyState == WebSocket.OPEN) ws.send(textEncoder.encode(document.getElementById("username").value));
             }
         }
 
