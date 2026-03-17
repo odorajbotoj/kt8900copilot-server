@@ -38,21 +38,31 @@
             <p><span>数据状态: </span><span id="datastat"></span></p>
         </div>
         <div>
-            <hr>
             <div>
+                <button
+                    onclick="document.querySelectorAll('.hidable').forEach(e => e.hidden = true); document.getElementById('div-conf').hidden = false;">配置</button>
+                <button
+                    onclick="document.querySelectorAll('.hidable').forEach(e => e.hidden = true); document.getElementById('div-play').hidden = false;">预录制</button>
+                <button
+                    onclick="document.querySelectorAll('.hidable').forEach(e => e.hidden = true); document.getElementById('div-aprs').hidden = false;">APRS</button>
+                <button
+                    onclick="document.querySelectorAll('.hidable').forEach(e => e.hidden = true); document.getElementById('div-reset').hidden = false;">重启</button>
+                <button
+                    onclick="document.querySelectorAll('.hidable').forEach(e => e.hidden = true); document.getElementById('div-ptt').hidden = false;">PTT</button>
+            </div>
+            <hr>
+            <div hidden class="hidable" id="div-conf">
                 <label for="setconf">配置项: </label>
                 <input id="setconf" type="text">
                 <button onclick="setconf();">更新配置</button>
             </div>
-            <hr>
-            <div>
+            <div hidden class="hidable" id="div-play">
                 <label for="play">预录制文件: </label>
                 <textarea id="play"></textarea>
                 <br>
                 <button onclick="play();">播放声音</button>
             </div>
-            <hr>
-            <div>
+            <div hidden class="hidable" id="div-aprs">
                 <div>
                     <label for="tocall">TO CALL:</label>
                     <input type="text" id="tocall">
@@ -108,13 +118,11 @@
                     <button onclick="aprs();">SEND APRS</button>
                 </div>
             </div>
-            <hr>
-            <div>
+            <div hidden class="hidable" id="div-reset">
                 <button
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x16, 0x00, 0x00]));">重启ESP32</button>
             </div>
-            <hr>
-            <div>
+            <div class="hidable" id="div-ptt">
                 <button id="ptt" onclick="ptt(!pttStat);" style="width: 10dvw; height: 10dvh;">单击发射</button>
             </div>
             <hr>
