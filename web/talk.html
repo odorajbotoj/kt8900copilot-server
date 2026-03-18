@@ -278,33 +278,25 @@
         }
         function play() {
             if (!ws || ws.readyState != WebSocket.OPEN) return;
-            let py = pinyinPro.pinyin(document.getElementById("play").value, { toneType: "num", type: "array" });
-            for (let i in py) {
-                if (py[i] == "?") {
-                    py[i] = "wd-cq";
-                } else if (py[i] == "!") {
-                    py[i] = "wd-73";
-                } else if (py[i] == "(") {
-                    py[i] = "wd-qsl1";
-                } else if (py[i] == ")") {
-                    py[i] = "wd-qsl2";
-                } else if (py[i] == "^") {
-                    py[i] = "wd-sat";
-                } else if (py[i] == ":") {
-                    py[i] = "wd-thisis";
-                } else if (py[i] == "@") {
-                    py[i] = "wd-qrz";
-                } else if (py[i] == "$") {
-                    py[i] = "wd-thankyou";
-                } else if (py[i] == ",") {
-                    py[i] = "mute-05";
-                } else if (py[i] == "-") {
-                    py[i] = "beacon";
-                } else if (/^[a-z]$/.test(py[i])) {
-                    py[i] = "pa-" + py[i];
-                }
+            let pinyinStat = true;
+            let arr = new Array();
+            let tmps = "";
+            let inp = document.getElementById("play").value;
+            for (let i of inp) {
+                if (i == '"') {
+                    if (tmps != "") {
+                        if (pinyinStat) arr.push(...pinyinPro.pinyin(tmps, { toneType: "num", type: "array" }));
+                        else arr.push(tmps);
+                    }
+                    pinyinStat = !pinyinStat;
+                    tmps = "";
+                } else tmps += i;
             }
-            let s = textEncoder.encode(py.join("/"));
+            if (tmps != "") {
+                if (pinyinStat) arr.push(...pinyinPro.pinyin(tmps, { toneType: "num", type: "array" }));
+                else arr.push(tmps);
+            }
+            let s = textEncoder.encode(arr.join("/"));
             let ab = new ArrayBuffer(s.length + 3);
             let u8a = new Uint8Array(ab);
             u8a[0] = 0x17;

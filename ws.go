@@ -152,7 +152,7 @@ func wsCallback(w http.ResponseWriter, r *http.Request) {
 	go verifyClient(connId, conn, &c, doneCh, &rst)
 
 	select {
-	case <-time.After(20 * time.Second):
+	case <-time.After(5 * time.Second):
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte{REFUSE, 0, 0}); err != nil { // refuse connection
 			log.Printf("[%d] conn refuse: conn write error: %v\n", connId, err)
 		}
