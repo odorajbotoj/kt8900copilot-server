@@ -123,6 +123,9 @@
                     onclick="if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x16, 0x00, 0x00]));">重启ESP32</button>
             </div>
             <div class="hidable" id="div-ptt">
+                <label for="autoaprs">松开PTT自动发射APRS</label>
+                <input type="checkbox" id="autoaprs">
+                <br>
                 <button id="ptt" onclick="ptt(!pttStat);" style="width: 10dvw; height: 10dvh;">单击发射</button>
             </div>
             <hr>
@@ -230,7 +233,6 @@
         registerProcessor("pcm-capture", PCMCapture);
     </script>
     <script>
-        // console.log(pinyinPro.pinyin("测试拼音12abc3 // 1/1", { toneType: "num", type: "array" }));
         var pttStat = false;
         var ws = null;
         const textEncoder = new TextEncoder();
@@ -568,6 +570,7 @@
                 document.getElementById("datastat").innerText = "发送音频完成";
                 document.getElementById("ptt").innerText = "单击发射";
                 if (mediaStack) mediaStack.getTracks()[0].stop()
+                if (document.getElementById("autoaprs").checked) aprs();
             }
         }
     </script>
