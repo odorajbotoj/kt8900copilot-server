@@ -126,6 +126,9 @@
                 <label for="autoaprs">松开PTT自动发射APRS</label>
                 <input type="checkbox" id="autoaprs">
                 <br>
+                <label for="autoplay">松开PTT自动播放预录制文件</label>
+                <input type="checkbox" id="autoplay">
+                <br>
                 <button id="ptt" onclick="ptt(!pttStat);" style="width: 10dvw; height: 10dvh;">单击发射</button>
             </div>
             <hr>
@@ -235,6 +238,7 @@
     <script>
         var pttStat = false;
         var ws = null;
+        var callbackPlay = false;
         const textEncoder = new TextEncoder();
         const textDecoder = new TextDecoder();
 
@@ -294,6 +298,8 @@
                     py[i] = "wd-thankyou";
                 } else if (py[i] == ",") {
                     py[i] = "mute-05";
+                } else if (py[i] == "-") {
+                    py[i] = "beacon";
                 } else if (/^[a-z]$/.test(py[i])) {
                     py[i] = "pa-" + py[i];
                 }
@@ -447,30 +453,33 @@
                     pStatErrSetConf.innerText = `${Date().toLocaleString()} get error: failed to set config.`;
                     document.getElementById("outputs").prepend(pStatErrSetConf);
                     return;
-                case 0x34: // stat set config error
-                    let pStatErrCamDisabled = document.createElement("p");
-                    pStatErrCamDisabled.innerText = `${Date().toLocaleString()} get error: camera is not enabled.`;
-                    document.getElementById("outputs").prepend(pStatErrCamDisabled);
-                    return;
-                case 0x35: // play ok
+                case 0x34: // play ok
                     let pStatPlay = document.createElement("p");
                     pStatPlay.innerText = `${Date().toLocaleString()} status: play sounds ok.`;
                     document.getElementById("outputs").prepend(pStatPlay);
                     return;
-                case 0x36: // play error
+                case 0x35: // play error
                     let pStatErrPlay = document.createElement("p");
                     pStatErrPlay.innerText = `${Date().toLocaleString()} get error: failed to play sounds.`;
                     document.getElementById("outputs").prepend(pStatErrPlay);
                     return;
-                case 0x37: // afsk ok
+                case 0x36: // afsk ok
                     let pStatAFSK = document.createElement("p");
                     pStatAFSK.innerText = `${Date().toLocaleString()} status: afsk send ok.`;
                     document.getElementById("outputs").prepend(pStatAFSK);
+                    if (callbackPlay) {
+                        play();
+                        callbackPlay = false;
+                    }
                     return;
-                case 0x38: // afsk error
+                case 0x37: // afsk error
                     let pStatErrAFSK = document.createElement("p");
                     pStatErrAFSK.innerText = `${Date().toLocaleString()} get error: failed to send afsk.`;
                     document.getElementById("outputs").prepend(pStatErrAFSK);
+                    if (callbackPlay) {
+                        play();
+                        callbackPlay = false;
+                    }
                     return;
                 case 0x51: // from
                     document.getElementById("datafrom").innerText = textDecoder.decode(d.slice(3));
@@ -570,7 +579,15 @@
                 document.getElementById("datastat").innerText = "发送音频完成";
                 document.getElementById("ptt").innerText = "单击发射";
                 if (mediaStack) mediaStack.getTracks()[0].stop()
-                if (document.getElementById("autoaprs").checked) aprs();
+                let aprsSend = false;
+                if (document.getElementById("autoaprs").checked) {
+                    aprs();
+                    aprsSend = true;
+                }
+                if (document.getElementById("autoplay").checked) {
+                    if (aprsSend) callbackPlay = true;
+                    else play();
+                }
             }
         }
     </script>
