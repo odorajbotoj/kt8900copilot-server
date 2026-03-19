@@ -567,10 +567,9 @@
                     .catch((err) => { alert('media error: ' + err.message); });
             } else {
                 // ptt off
-                if (ws && ws.readyState == WebSocket.OPEN) ws.send(Uint8Array.from([0x12, 0x00, 0x00]));
+                if (mediaStack) mediaStack.getTracks()[0].stop()
                 document.getElementById("datastat").innerText = "发送音频完成";
                 document.getElementById("ptt").innerText = "单击发射";
-                if (mediaStack) mediaStack.getTracks()[0].stop()
                 let aprsSend = false;
                 if (document.getElementById("autoaprs").checked) {
                     aprs();
